@@ -1,0 +1,22 @@
+CREATE DATABASE projetoChecklists;
+USE projetoChecklists;
+
+CREATE TABLE tChecklists (
+    id VARCHAR(50) PRIMARY KEY,
+    description VARCHAR(500) NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+    inactivated_at TIMESTAMP NULL DEFAULT NULL
+);
+
+CREATE TABLE tChecklistItems (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    checklist_id VARCHAR(50),
+    id_father INT,
+    description VARCHAR(500) NOT NULL,
+    is_concluded INT,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+    inactivated_at TIMESTAMP NULL DEFAULT NULL,
+    FOREIGN KEY (checklist_id) REFERENCES tChecklists(id)
+);
