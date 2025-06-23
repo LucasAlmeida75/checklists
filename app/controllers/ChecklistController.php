@@ -1,133 +1,150 @@
 <?php
-    class ChecklistController extends Controller {
-        public function index() {
-            $this->redirect($this->siteUrl("auth/entrar"));
-        }
+class ChecklistController extends Controller
+{
+    private $request;
 
-        public function detalhes($id = null) {
-            if ($id == null) {
-                try {
-                    $id  = substr(str_shuffle('0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'), 0, 6);
+    public function __construct()
+    {
+        $this->request = $this->request('checklist');
+    }
 
-                    $obj = $this->model('Checklist');
+    public function index()
+    {
+        $this->redirect($this->siteUrl("auth/entrar"));
+    }
 
-                    $obj->insert(['id' => $id, 'description' => 'Nova Checklist']);
-
-                    $this->redirect($this->siteUrl("checklist/detalhes/$id"));
-                } catch (PDOException $e) {
-                    die("Erro ao buscar checklists: " . $e->getMessage());
-                }
-            } else {
-                try {
-                    $obj = $this->model('Checklist');
-                    $data['checklist'] = $obj->searchById($id)["result"];
-
-                    if (!is_array($data["checklist"])) {
-                        $this->redirect($this->siteUrl("checklist/detalhes"));
-                    } else {
-                        $obj = $this->model('ChecklistItem');
-                        $data['checklistsItem'] = $obj->searchById($id)["result"];
-                    }
-
-                    if (!is_array($data["checklistsItem"])) {
-                        $data["checklistsItem"] = [];
-                    }
-
-                } catch (PDOException $e) {
-                    die("Erro ao buscar checklists: " . $e->getMessage());
-                }
-            }
-
-            $data["urlForm"] = $this->siteUrl("checklist/salvar/$id");
+    public function detalhes($id = null)
+    {
+        if ($id == null) {
+            $this->criarNovaChecklist();
+        } else {
+            $data = $this->buscarChecklist($id);
 
             $this->view("structure/header");
             $this->view("checklist/detalhes", $data);
             $this->view("structure/footer");
         }
+    }
 
-        public function salvar($id = null) {
-            if ($this->postRequest()) {
+    public function salvarChecklist($id)
+    {
+        if ($this->postRequest()) {
 
-                $this->validateProjeto($dados, $errors);
+            $dados = $this->request->validateChecklist();
 
-                if (empty($errors)) {
-
-                    try {
-                        $obj = $this->model('Checklist');
-
-                        $checklist = $obj->searchById($id)['result'];
-                        if (is_array($checklist)) {
-                            $obj->updateById($id, $dados);
-
-                            if (isset($dados['']))
-                            $obj = $this->model('ChecklistItem');
-
-                        }
-                    } catch (PDOException $e) {
-                        die("Erro ao atualizar checklist: " . $e->getMessage());
-                    }
-                } else {
-                    echo json_encode($errors);
-                    //$this->redirect($this->siteUrl("checklist/detalhes/$id"));
-                }
-            }
-        }
-
-        public function validateProjeto(&$dados = [], &$errors = []) {
-            $fieldsToValidate = [
-                'idChecklist' => [
-                    "fieldLabel"   => "ID do checklist",
-                    "required"     => true,
-                    "cleanHtml"    => true,
-                    "cleanSpecial" => true,
-                    "minLength"    => 0,
-                    "maxLength"    => 50
-                ],
-                'descriptionChecklist' => [
-                    "fieldLabel"   => "Descrição do checklist",
-                    "required"     => true,
-                    "cleanHtml"    => true,
-                    "cleanSpecial" => true,
-                    "minLength"    => 0,
-                    "maxLength"    => 450
-                ],
-                'idItem' => [
-                    "fieldLabel"   => "ID do item",
-                    "onlyNumbers"  => true,
-                    "minLength"    => 0,
-                    "maxLength"    => 250
-                ],
-                'concluded' => [
-                    "fieldLabel"   => "Item concluído",
-                    "onlyNumbers"  => true,
-                    "minLength"    => 0,
-                    "maxLength"    => 1
-                ],
-                'description' => [
-                    "fieldLabel"   => "Descrição do item",
-                    "cleanHtml"    => true,
-                    "cleanSpecial" => true,
-                    "minLength"    => 0,
-                    "maxLength"    => 450
-                ]
-            ];
-
-            $validationResults = $this->validateFields($fieldsToValidate);
-
-            if ($validationResults['valid']) {
-                $dados  = $validationResults['data'];
-            } else {
-                $errors = $validationResults['errors'];
-            }
-        }
-
-        public function removeCustomer($id) {
             try {
                 $obj = $this->model('Checklist');
-                $obj->removeById($id);
+
+                $checklist = $obj->searchById($id)['result'];
+                if (is_array($checklist)) {
+                    $obj->updateById($id, $dados);
+                }
             } catch (PDOException $e) {
-                die("Erro ao remover checklist: " . $e->getMessage());
+                die("Erro ao atualizar checklist: " . $e->getMessage());
             }
         }
     }
-?>
+
+    public function salvarChecklistItem($id = null)
+    {
+        if ($this->postRequest()) {
+
+            $dados = $this->request->validateChecklistItem();
+
+            try {
+                $obj = $this->model('ChecklistItem');
+
+                if ($id != null) {
+                    $item = $obj->searchById($id, $dados);
+
+                    if (is_array($item) && count($item)) {
+                        $obj->updateById($id, $dados);
+                    }
+                } else {
+                    $id = $obj->insert($dados)['result'];
+                }
+
+                echo json_encode(['id' => $id]);
+            } catch (PDOException $e) {
+                die("Erro ao atualizar item da checklist: " . $e->getMessage());
+            }
+        }
+    }
+
+    public function salvarPosicoes()
+    {
+        if ($this->postRequest()) {
+            $dados = $this->request->validatePositions();
+
+            if (is_array($dados)) {
+                try {
+                    $obj = $this->model('ChecklistItem');
+
+                    foreach ($dados as $dadosItem) {
+
+                        $item = $obj->searchById($dadosItem['itemId'], $dadosItem);
+
+                        if (is_array($item) && count($item)) {
+                            $obj->updatePosition($dadosItem);
+                        }
+                    }
+
+                } catch (PDOException $e) {
+                    die("Erro ao atualizar posições dos itens: " . $e->getMessage());
+                }
+            }
+        }
+    }
+
+    private function criarNovaChecklist()
+    {
+        try {
+            $id  = substr(str_shuffle('0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'), 0, 6);
+
+            $obj = $this->model('Checklist');
+
+            $obj->insert(['id' => $id, 'description' => 'Nova Checklist']);
+
+            $this->redirect($this->siteUrl("checklist/detalhes/$id"));
+        } catch (PDOException $e) {
+            die("Erro ao buscar checklists: " . $e->getMessage());
+        }
+    }
+
+    private function buscarChecklist($id)
+    {
+        try {
+            $obj = $this->model('Checklist');
+            $data['checklist'] = $obj->searchById($id)["result"];
+
+            if (!is_array($data["checklist"])) {
+                $this->redirect($this->siteUrl("checklist/detalhes"));
+            } else {
+                $obj = $this->model('ChecklistItem');
+                $data['checklistsItem'] = $obj->searchByChecklistId($id)["result"];
+            }
+
+            if (!is_array($data["checklistsItem"])) {
+                $data["checklistsItem"] = [];
+            }
+
+            return $data;
+        } catch (PDOException $e) {
+            die("Erro ao buscar checklists: " . $e->getMessage());
+        }
+    }
+
+    public function deleteChecklistItem($id)
+    {
+        try {
+            $dados = $this->request->validateDelete();
+
+            if (isset($dados['lastUrlElement'])) {
+                $obj = $this->model('ChecklistItem');
+                $obj->deleteById($id);
+            }
+        } catch (PDOException $e) {
+            die("Erro ao remover checklist: " . $e->getMessage());
+        }
+    }
+}

@@ -10,6 +10,12 @@ class Controller {
         require_once "../app/views/$view.php";
     }
 
+    protected function request($request) {
+        $request = ucfirst($request) . "Request";
+        require_once "../app/requests/$request.php";
+        return new $request();
+    }
+
     protected function redirect($url, $permanent = false) {
         if (headers_sent() === false) {
             header('Location: ' . $url, true, ($permanent === true) ? 301 : 302);
@@ -38,6 +44,15 @@ class Controller {
         return $urlCompleta;
     }
 
+    protected function lastUrlElement() {
+        $url = $this->fullUrl();
+
+        $parts       = explode('/', $url);
+        $lastElement = end($parts);
+
+        return $lastElement;
+    }
+
     protected function processData() {
 
         $method = $_SERVER['REQUEST_METHOD'];
@@ -58,8 +73,79 @@ class Controller {
             $data = $_GET;
         }
 
+        $data['lastUrlElement'] = $this->lastUrlElement();
+
         return $data;
 
+    }
+
+
+    protected function validateEngine($fieldsToValidate) {
+        $data   = $this->processData();
+        $dados  = [];
+        $errors = [];
+
+        $this->validarCampos($data, $fieldsToValidate, $dados, $errors);
+
+        if (count($errors) > 0) {
+            echo json_encode(['errors' => $errors]);
+            exit;
+        }
+
+        return $dados;
+    }
+
+    protected function validarCampos($camposRecebidos, $validacoes, &$dados, &$errors, $isArray = false, $i = 0) {
+
+        foreach ($camposRecebidos as $nomeCampo=>$value) {
+            if (is_array($value)) {
+                $this->validarCampos($value, $validacoes, $dados, $errors, true, $i);
+                $i++;
+                continue;
+            }
+
+            if (isset($validacoes[$nomeCampo])) {
+                $options = $validacoes[$nomeCampo];
+
+                if (isset($options['cleanHtml']) && $options['cleanHtml'] === true) {
+                    $value = strip_tags($value);
+                }
+
+                if (isset($options['cleanSpecial']) && $options['cleanSpecial'] === true) {
+                    $value = preg_replace('/[^\p{L}\p{N}\s]/u', '', $value);
+                }
+
+                if (isset($options['toUpper']) && $options['toUpper'] === true) {
+                    $value = mb_strtoupper($value);
+                }
+
+                if (isset($options['onlyNumbers']) && $options['onlyNumbers'] === true) {
+                    $value = preg_replace('/\D/', '', $value);
+                }
+
+                $validationResult = $this->applyValidation($value, $options);
+
+                if ($isArray) {
+                    if ($validationResult !== true) {
+                        if (isset($options["fieldLabel"]))
+                            $errors[$i][$options["fieldLabel"]] = $validationResult;
+                        else
+                            $errors[$i][$nomeCampo] = $validationResult;
+                    } else {
+                        $dados[$i][$nomeCampo] = $value;
+                    }
+                } else {
+                    if ($validationResult !== true) {
+                        if (isset($options["fieldLabel"]))
+                            $errors[$options["fieldLabel"]] = $validationResult;
+                        else
+                            $errors[$nomeCampo] = $validationResult;
+                    } else {
+                        $dados[$nomeCampo] = $value;
+                    }
+                }
+            }
+        }
     }
 
     protected function validateFields($fields) {

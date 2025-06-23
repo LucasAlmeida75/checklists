@@ -35,7 +35,7 @@ class Database {
         return self::$instance;
     }
 
-    public function executeQuery($query, $params = []) {
+    public function executeQuery($query, $params = [], $returnId = false) {
         foreach ($params as $k=>$param) {
             $placeholder = ':' . $k;
             $query = preg_replace('/\?/', $placeholder, $query, 1);
@@ -44,7 +44,11 @@ class Database {
         $this->lastQuery = $query;
         $stmt = $this->pdo->prepare($query);
         $stmt->execute($params);
-        return $stmt;
+        if ($returnId) {
+            return $this->pdo->lastInsertId();
+        } else {
+            return $stmt;
+        }
     }
 
     public function getQueryWithParams($query, $params) {
@@ -52,7 +56,7 @@ class Database {
         foreach ($params as $key => $value) {
             if (is_array($value)) {
                 $value = implode(', ', array_map([$this->pdo, 'quote'], $value));
-                $query = preg_replace('/' . preg_quote($key) . '\b/', $value, $query, 1); // Substituir apenas a primeira ocorrência
+                $query = preg_replace('/' . preg_quote($key) . '\b/', $value, $query, 1);
             } else {
                 $query = str_replace($key, $this->pdo->quote($value), $query);
             }

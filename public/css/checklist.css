@@ -9,6 +9,8 @@
 .input-checklist {
     font-size: 5vh;
     font-weight: bold;
+    border: none;
+    box-shadow: none;
 }
 
 .input-checklist:focus {
@@ -18,4 +20,10 @@
 
 .input-checklist#description {
     font-size: 2vh;
+}
+
+.itemConcluded {
+    color: gray;
+    opacity: 0.5;
+    text-decoration: line-through;
 }
